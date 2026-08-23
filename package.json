@@ -1,0 +1,17 @@
+{
+  "name": "bot_wa",
+  "version": "1.0.0",
+  "description": "",
+  "main": "auto-war.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@napi-rs/clipboard": "^1.1.4",
+    "clipboardy": "^5.3.2"
+  }
+}
