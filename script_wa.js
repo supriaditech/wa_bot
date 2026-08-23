@@ -68,91 +68,42 @@
   btn.addEventListener('click', () => setLock(!locked));
   document.body.appendChild(btn);
 
-  function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
-    }
-    return Promise.resolve(fallbackCopy(text));
-  }
+  function copyBubbleText(bubble) {
+    const content = bubble.querySelector('[data-testid="selectable-text"]');
+    if (!content) return false;
 
-  function fallbackCopy(text) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
+    const marks = [];
+    for (const el of content.querySelectorAll('[data-app-text-template]')) {
+      const before = document.createTextNode('*');
+      const after = document.createTextNode('*');
+      el.parentNode.insertBefore(before, el);
+      el.parentNode.insertBefore(after, el.nextSibling);
+      marks.push(before, after);
+    }
+
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    sel.addRange(range);
     let ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    document.body.removeChild(ta);
+    sel.removeAllRanges();
+
+    for (const node of marks) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+    }
     return ok;
-  }
-
-  function getHiddenText(el) {
-    return el.getAttribute('alt')
-      || el.getAttribute('data-plain-text')
-      || el.getAttribute('aria-label')
-      || el.getAttribute('title');
-  }
-
-  function extractMessageText(bubble) {
-    const clone = bubble.cloneNode(true);
-    const out = [];
-    const walk = (node) => {
-      for (const child of node.childNodes) {
-        if (child.nodeType === Node.TEXT_NODE) {
-          out.push(child.textContent);
-        } else if (child.nodeType === Node.ELEMENT_NODE) {
-          if (child.getAttribute('aria-hidden') === 'true') continue;
-          if (child.children.length === 0 && /^\d{1,2}[:.]\d{2}$/.test(child.textContent.trim())) continue;
-          const tag = child.tagName;
-          if (tag === 'BR') {
-            out.push('\n');
-          } else if (tag === 'IMG') {
-            const alt = getHiddenText(child);
-            if (alt) out.push(alt);
-            continue;
-          } else if (child.children.length === 0) {
-            const leaf = child.textContent || '';
-            if (leaf === '\n' || leaf === '\r\n') {
-              out.push('\n');
-              continue;
-            }
-            if (leaf.trim() === '') {
-              const alt = getHiddenText(child);
-              if (alt && /\p{Extended_Pictographic}/u.test(alt)) out.push(alt);
-              continue;
-            }
-            out.push(leaf);
-            continue;
-          } else {
-            const isBlock = /^(DIV|P|LI|H[1-6]|SECTION|UL|OL|BLOCKQUOTE)$/.test(tag);
-            if (isBlock) out.push('\n');
-            walk(child);
-            if (isBlock) out.push('\n');
-          }
-        }
-      }
-    };
-    walk(clone);
-    return out.join('')
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
   }
 
   document.addEventListener('contextmenu', (e) => {
     const bubble = e.target.closest('div.copyable-text');
     if (!bubble) return;
     e.preventDefault();
-    const imgs = bubble.querySelectorAll('img');
-    if (imgs.length) {
-      console.log('🔍 Debug emoji img:', [...imgs].map((i) => i.getAttribute('alt') || '(tanpa alt)').join(' | '));
-    }
-    const text = extractMessageText(bubble);
-    if (!text) return;
-    copyToClipboard(text).then(() => {
-      console.log('📋 Klik-kanan: teks pesan masuk clipboard (emoji & baris terjaga).');
-    });
+    const ok = copyBubbleText(bubble);
+    console.log(ok
+      ? '📋 Klik-kanan: teks disalin (emoji, angka, markdown * terjaga).'
+      : '⚠️ Gagal salin otomatis — gunakan menu Salin bawaan WA.');
   }, true);
 
   setLock(true);
