@@ -4,7 +4,7 @@ process.on('uncaughtException', (err) => console.error('💥 Uncaught Exception:
 process.on('unhandledRejection', (err) => console.error('💥 Unhandled Rejection:', err));
 
 const SESSIONS = ["SIANG"];
-const DATA_PASIEN = "Khairun Nisa S. - Pulpektomi";
+const DATA_PASIEN = "Khairun Nisa S. (59) - Pulpektomi ";
 
 let lastClipboard = "";
 let isProcessing = false;
@@ -13,13 +13,14 @@ function fillFirstEmptySlot(text, sesi) {
   let inSession = false;
   let filled = false;
   return text.split(/\r?\n/).map((line) => {
-    const core = line.trim().replace(/[^A-Za-z]/g, '').toUpperCase();
+    const trimmed = line.trim();
+    const core = trimmed.replace(/[^A-Za-z]/g, '').toUpperCase();
     if (/^(?:SESI)?(?:PAGI|SIANG)/.test(core)) {
       inSession = core.startsWith(sesi) || core.startsWith('SESI' + sesi);
       filled = false;
       return line;
     }
-    if (inSession && !filled && /^\d+\.$/.test(line.trim())) {
+    if (inSession && !filled && /^\d+\.$/.test(trimmed)) {
       filled = true;
       return `${line} ${DATA_PASIEN}`;
     }
@@ -41,8 +42,9 @@ setInterval(async () => {
   try {
     let currentClipboard = await clipboard.read();
 
-    // 1. Bersihkan semua karakter gaib bawaan WA Web sebelum diolah
-    currentClipboard = currentClipboard.replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u2060]/g, '');
+    // 1. Bersihkan karakter gaib bawaan WA Web (HANYA yang invisible;
+    //    U+200D ZWJ DIKECUALIKAN karena bagian dari emoji sequence seperti ❤️‍🔥)
+    currentClipboard = currentClipboard.replace(/[\u200B-\u200C\uFEFF\u200E\u200F\u2060]/g, '');
 
     const upperText = currentClipboard.toUpperCase();
     const isFullFormat = upperText.includes("FULL");
