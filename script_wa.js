@@ -9,6 +9,9 @@
   let anchor = 0;
   let scrollers = [];
   let btn = null;
+  let observer = null;
+  let muted = false;
+  let muteTimer = null;
 
   function findScrollers() {
     const main = document.querySelector('#main');
@@ -30,7 +33,11 @@
 
   function setLock(v) {
     locked = v;
-    scrollers = findScrollers();
+    scrollers = locked ? findScrollers() : [];
+    if (observer) {
+      if (locked) observer.observe(document.querySelector('#main') || document.body, { childList: true, subtree: true });
+      else observer.disconnect();
+    }
     if (locked) {
       anchor = scrollers.length ? scrollers[0].scrollTop : 0;
       if (btn) {
@@ -47,24 +54,46 @@
     }
   }
 
-  setInterval(() => {
-    if (scrollers.length === 0) scrollers = findScrollers();
-    if (!scrollers.length) return;
-    if (!locked) {
-      anchor = scrollers[0].scrollTop;
-      return;
-    }
-    if (scrollers[0].scrollTop !== anchor) scrollers[0].scrollTop = anchor;
-  }, 80);
+  let refreshTimer = null;
 
-  window.addEventListener('scroll', () => {
-    if (!locked || !scrollers.length) return;
+  function refreshScrollers() {
+    if (scrollers[0] && scrollers[0].isConnected) return;
+    const found = findScrollers();
+    if (!found.length) return;
+    scrollers = found;
+    anchor = scrollers[0].scrollTop;
+  }
+
+  window.addEventListener('scroll', (e) => {
+    if (!locked || muted) return;
+    if (!scrollers.length) refreshScrollers();
+    if (!scrollers.length) return;
+    if (e.target !== scrollers[0]) return;
     if (scrollers[0].scrollTop !== anchor) scrollers[0].scrollTop = anchor;
   }, true);
 
-  new MutationObserver(() => {
-    scrollers = findScrollers();
-  }).observe(document.body, { childList: true, subtree: true });
+  observer = new MutationObserver(() => {
+    if (!locked || muted) return;
+    if (refreshTimer) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      refreshScrollers();
+    }, 800);
+  });
+  observer.observe(document.querySelector('#main') || document.body, { childList: true, subtree: true });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    if (!e.target || !e.target.closest || !e.target.closest('#main')) return;
+    muted = true;
+    if (observer) observer.disconnect();
+    if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+    clearTimeout(muteTimer);
+    muteTimer = setTimeout(() => {
+      muted = false;
+      if (locked && observer) observer.observe(document.querySelector('#main') || document.body, { childList: true, subtree: true });
+    }, 1500);
+  }, true);
 
   btn = document.createElement('div');
   btn.textContent = '🔒 Terkunci';
@@ -84,12 +113,14 @@
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    const prevFocus = document.activeElement;
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
     let ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     document.body.removeChild(ta);
+    if (prevFocus && prevFocus.isConnected && typeof prevFocus.focus === 'function') prevFocus.focus();
     return ok;
   }
 
